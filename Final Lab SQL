@@ -1,0 +1,229 @@
+2.1 Part One: Query Problems Using the “alanparadise/cm” rep
+
+1. List  the names of the cities in alphabetical order where Classic Models has offices. (7)
+
+SELECT city
+FROM "dtsa5900/classic_models_db"."offices"
+ORDER BY 1
+
+
+2. List the EmployeeNumber, LastName, FirstName, Extension for all employees working out of the Paris office. (5) 
+
+
+SELECT employeenumber, lastname, firstname, extension, E.officecode
+FROM "dtsa5900/classic_models_db"."employees" E JOIN
+"dtsa5900/classic_models_db"."offices" O ON E.officecode = O.officecode
+WHERE E.officecode = 4
+
+ 
+3. List the ProductCode, ProductName, ProductVendor, QuantityInStock and ProductLine for all products with a QuantityInStock between 200 and 1200. (11) 
+
+
+SELECT productcode, productname, productvendor, quantityinstock, productline
+FROM "dtsa5900/classic_models_db"."products" 
+WHERE quantityinstock >= 200 AND
+quantityinstock <= 1200
+
+
+4. (Use a SUBQUERY) List the ProductCode, ProductName, ProductVendor, BuyPrice and MSRP for the least expensive (lowest MSRP) product sold by ClassicModels.  (“MSRP” is the Manufacturer’s Suggested Retail Price.)  (1)    
+
+
+SELECT productcode, productname, productvendor, buyprice, msrp
+FROM "dtsa5900/classic_models_db"."products" 
+WHERE msrp = (
+    select MIN(msrp)
+FROM "dtsa5900/classic_models_db"."products" )
+
+
+5. What is the ProductName and Profit of the product that has the highest profit (profit = MSRP minus BuyPrice). (1)
+
+
+SELECT productname, (msrp - buyprice) as "Profit"
+FROM "dtsa5900/classic_models_db"."products" 
+ORDER BY 2 desc LIMIT 1
+
+   
+6. List the country and the number of customers from that country for all countries having just two  customers.  List the countries sorted in ascending alphabetical order. Title the column heading for the count of customers as “Customers”. (7)   *****
+
+
+SELECT count(customernumber) as "Customers", country
+FROM "dtsa5900/classic_models_db"."customers" 
+GROUP BY country
+HAVING count(customernumber) = 2
+ORDER BY 2
+
+
+7. List the ProductCode, ProductName, and number of orders for the products with exactly 25 orders.  Title the column heading for the count of orders as “OrderCount”.  (12)  
+
+SELECT OD.productcode, productname, count(ordernumber) as "OrderCount"
+FROM "dtsa5900/classic_models_db"."products" P JOIN 
+"dtsa5900/classic_models_db"."orderdetails" OD ON P.productcode = OD.productcode
+GROUP BY productname, OD.productcode
+HAVING count(ordernumber) = 25
+
+
+8. List the EmployeeNumber, Firstname + Lastname  (concatenated into one column in the answer set, separated by a blank and referred to as ‘name’) for all the employees reporting to Diane Murphy or Gerard Bondur. (8)  
+
+SELECT employeenumber, concat(firstname, ' ', lastname) as "name"
+FROM "dtsa5900/classic_models_db"."employees" 
+WHERE reportsto = ('1002') OR 
+reportsto = ('1102')
+
+
+9. List the EmployeeNumber, LastName, FirstName of the president of the company (the one employee with no boss.)  (1)  
+
+
+SELECT employeenumber, lastname, firstname
+FROM "dtsa5900/classic_models_db"."employees" 
+WHERE reportsto is NULL
+
+
+10. List the ProductName for all products in the “Classic Cars” product line from the 1950’s.  (6)
+
+
+SELECT productname, productline
+FROM "dtsa5900/classic_models_db"."products" 
+WHERE productname like '%195%' AND
+productline = 'Classic Cars'
+
+
+11. List the month name and the total number of orders for the month in 2004 in which ClassicModels customers placed the most orders. (1)  ***
+
+Done as the example seen in past modules
+
+SELECT customernumber, count(ordernumber)
+ to_char(orderdate, 'month') as "Month name"
+FROM "dtsa5900/classic_models_db"."orders"
+GROUP BY customernumber 
+HAVING to_char(orderdate, 'month') like '%2004%'
+ORDER BY 2 desc LIMIT 1
+
+12. List the firstname, lastname of employees who are Sales Reps who have no assigned customers.  (2) 
+
+
+SELECT firstname, lastname, jobtitle, employeenumber, count(salesrepemployeenumber) as "Total Customers"
+FROM "dtsa5900/classic_models_db"."employees" E LEFT OUTER JOIN
+"dtsa5900/classic_models_db"."customers" C ON E.employeenumber = C.salesrepemployeenumber
+GROUP BY firstname, lastname, jobtitle, employeenumber
+HAVING jobtitle like '%Sales Rep%' AND count(salesrepemployeenumber) = 0
+
+
+13. List the customername of customers from Switzerland with no orders. (2)
+
+
+SELECT customername, country, C.customernumber, count(ordernumber)
+FROM "dtsa5900/classic_models_db"."customers" C LEFT OUTER JOIN 
+"dtsa5900/classic_models_db"."orders" O ON C.customernumber = O.customernumber
+GROUP BY customername, country, C.customernumber
+HAVING country = 'Switzerland' and count(ordernumber) = 0
+
+
+14. List the customername and total quantity of products ordered for customers who have ordered more than 1650 products across all their orders.  (8) 
+
+
+SELECT customername, C.customernumber, sum(quantityordered) as "Total Quantity Ordered"
+FROM "dtsa5900/classic_models_db"."customers" C JOIN 
+"dtsa5900/classic_models_db"."orders" O ON C.customernumber = O.customernumber
+JOIN "dtsa5900/classic_models_db"."orderdetails" OD ON O.ordernumber = OD.ordernumber
+GROUP BY customername, C.customernumber
+HAVING sum(quantityordered) > 1650
+
+2.2 Demo_Repo
+
+1. Create a NEW table named “TopCustomers” with three columns: CustomerNumber (integer), ContactDate (DATE) and  OrderTotal (a real number.)  None of these columns can be NULL.  
+
+
+CREATE table TopCustomers(
+    customernumber INT NOT NULL,
+    contactdate DATE NOT NULL,
+    ordertotal REAL NOT NULL 
+)
+
+
+2. Populate the new table “TopCustomers” with the CustomerNumber, today’s date, and the total value of all their orders (PriceEach * quantityOrdered) for those customers whose order total value is greater than $140,000. (should insert 10 rows )  
+
+Query made to get the rows:
+
+SELECT O.customernumber, sum(priceeach * quantityordered) as "Total Ordered"
+FROM "dtsa5900/classic_models_db"."customers" C JOIN 
+"dtsa5900/classic_models_db"."orders" O ON C.customernumber = O.customernumber
+JOIN 
+"dtsa5900/classic_models_db"."orderdetails" OD ON O.ordernumber = OD.ordernumber
+GROUP BY O.customernumber
+HAVING sum(priceeach * quantityordered) > 140000
+order by 2 DESC
+
+Insert queries 
+
+INSERT INTO topcustomers
+    VALUES ('141', '09-25-2022','820689')
+
+
+INSERT INTO topcustomers
+    VALUES ('124', '09-25-2022','591827')
+
+
+INSERT INTO topcustomers
+    VALUES ('114', '09-25-2022','180505')
+
+INSERT INTO topcustomers
+    VALUES ('151', '09-25-2022','177913')
+
+INSERT INTO topcustomers
+    VALUES ('119', '09-25-2022','158573')
+
+
+INSERT INTO topcustomers
+    VALUES ('148', '09-25-2022','156251')
+
+
+INSERT INTO topcustomers
+    VALUES ('323', '09-25-2022','154622')
+
+
+INSERT INTO topcustomers
+    VALUES ('131', '09-25-2022','149085')
+
+
+INSERT INTO topcustomers
+    VALUES ('187', '09-25-2022','148410')
+
+INSERT INTO topcustomers
+    VALUES ('450', '09-25-2022','143536')
+
+
+
+3. List the contents of the TopCustomers table in descending OrderTotal sequence. (10) 
+
+
+select customernumber, ordertotal
+FROM topcustomers
+ORDER BY 2 desc
+
+
+4. Add a new column to the TopCustomers table called OrderCount (integer).
+
+
+ALTER TABLE topcustomers
+ADD ordercount INT
+
+
+5. Update the Top Customers table, setting the OrderCount to a random number between 1 and 10.  
+Hint:  use (RANDOM() *10)
+
+
+UPDATE topcustomers 
+SET ordercount = (RANDOM() *10)
+
+
+6. List the contents of the TopCustomers table in descending OrderCount sequence. (10 rows)
+
+
+SELECT customernumber, contactdate, ordertotal, ordercount
+FROM topcustomers 
+ORDER BY 4 desc
+
+
+7. Drop the TopCustomers table. (no answer set)  
+
+DROP table topcustomers
