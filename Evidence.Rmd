@@ -1,0 +1,626 @@
+---
+title: "Evidence"
+author: "Marco Berlanga"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Introduction: In this business report we have a data base of movies with over 40,000 rows and 26 columns, we will be analyzing it using distinct statistical methods, we will also be cleaning and imputating missing data so we can do a proper analysis, all this with the purpose of drawing conclusions of what things makes a successful movie
+
+#Run the libraries so we can work with the functions they include
+
+```{r}
+library(dplyr)
+library(stringr)
+library(assertive)
+library(ggplot2)
+library(lubridate)
+library(readxl)
+library(forcats)
+library(visdat)
+library(stringdist)
+library(fuzzyjoin)
+library(gapminder)
+library(e1071)
+library(datasets)
+```
+
+#We stablish 'df1' as the name of our dataframe that is the movies metadata 
+
+```{r}
+
+df1 <- read.csv('movies_metadata.csv')
+
+```
+
+#Columns names 
+
+#Data description, we can appreciate the different types of data that makes a movie, from numeric values like runtime, budget, popularity, vote_average, renevue and vote_count to crucial character data like production_companies, status, original_languages and genres
+
+```{r}
+
+colnames(df1)
+
+```
+
+#We observe the kind of data the dataframe has, as we can see a lot of columns are in a different data type than they should not be in
+
+```{r}
+glimpse(df1)
+```
+
+#Changing the data type, most of them were in character data type
+
+```{r}
+df1$budget <- as.numeric(df1$budget)
+df1$id <- as.numeric(df1$id)
+df1$vote_count <- as.numeric(df1$vote_count)
+df1$adult <- as.logical(df1$adult)
+df1$video <- as.logical(df1$video)
+df1$release_date <- as.Date(df1$release_date)
+df1$popularity <- as.numeric(df1$popularity)
+```
+
+#Column budget had NA's so we create mutate another column and replace the NA's with the mean of the data
+
+```{r}
+
+summary(df1$budget)
+
+```
+
+```{r}
+df1 <- df1 %>%
+  mutate(budget_mean = replace(budget, is.na(budget),  4224579))
+
+summary(df1$budget_mean)
+```
+
+#No more NA's
+
+```{r}
+summary(df1$budget_mean)
+```
+
+#We apply the same procedure to replace NA's found in runtime column but replacing them now with the median
+
+```{r}
+summary(df1$runtime)
+```
+
+```{r}
+df1 <- df1 %>% 
+  mutate(runtime_median = replace(runtime, is.na(runtime), 95))
+
+summary(df1$runtime_median)
+```
+
+#Replacing NA's of revenue also with the mean
+
+```{r}
+summary(df1$revenue)
+```
+
+```{r}
+df1 <- df1 %>% 
+  mutate(revenue_mean = replace(revenue, is.na(runtime), 1.121e+07))
+
+summary(df1$revenue_mean)
+```
+
+#Replacing NA's of popularity also with the mean
+
+```{r}
+df1 <- df1 %>% 
+  mutate(popularity_mean = replace(popularity, is.na(popularity), 2.921))
+
+summary(df1$popularity_mean)
+```
+
+#Also with the mean
+
+```{r}
+
+df1 <- df1 %>% 
+  mutate(vote_average_mean = replace(vote_average, is.na(popularity), 5.618))
+
+summary(df1$vote_average_mean)
+
+
+```
+#Based on the fact that there are some specific movies that are way more popular than the other we do not stablish that they are out of range
+
+```{r}
+ggplot(df1, aes(vote_average)) +
+geom_histogram()
+```
+
+```{r}
+ggplot(df1, aes(vote_count)) +
+geom_histogram()
+```
+
+```{r}
+summary(df1$release_date)
+```
+
+#Finding out if there is duplicates
+
+```{r}
+
+sum(duplicated(df1))
+
+```
+
+#There are 17 fully duplicated rows, so now we eliminate them 
+
+```{r}
+
+df1 <- distinct(df1)
+sum(duplicated(df1))
+
+```
+
+
+#Using a smaller sample of the data so function vis_miss is able to run, 30,000 rows are being analyzed 
+
+```{r}
+
+sampledf1 <-head(df1, 30000)
+
+```
+
+#As we can obsvere from the previous sample the movies with the lowest vote average tend to have missing information in runtime and in its release date (MAR)
+
+```{r}
+
+sampledf1 %>% arrange(vote_average) %>% vis_miss()
+
+```
+
+#Cleaning genres
+
+```{r}
+df1$genres_string <- as.character(df1$genres)
+
+```
+
+```{r}
+new_genres <- str_split_fixed(df1$genres_string, ":", n = Inf)
+```
+
+```{r}
+new_genres <- new_genres[,1:7]
+```
+
+```{r}
+new_genres <- new_genres[, c(3,5,7)]
+```
+
+```{r}
+new_genres <- as.data.frame(new_genres)
+```
+
+```{r}
+#https://stat.ethz.ch/R-manual/R-devel/library/base/html/regex.html
+
+new_genres <- new_genres %>% 
+  mutate(genre1 = str_replace_all(new_genres$V1, "[[:punct:]]", " "))
+```
+
+```{r}
+new_genres <- new_genres %>% 
+  mutate(genre2 = str_replace_all(new_genres$V2, "[[:punct:]]", " "))
+```
+
+```{r}
+new_genres <- new_genres %>% 
+  mutate(genre3 = str_replace_all(new_genres$V3, "[[:punct:]]", " "))
+```
+
+```{r}
+new_genres$genre1 <- str_remove(new_genres$genre1,"id")
+new_genres$genre2 <- str_remove(new_genres$genre2,"id")
+new_genres$genre3 <- str_remove(new_genres$genre3,"id")
+```
+
+```{r}
+genres_clean <- new_genres[,4:6]
+```
+
+```{r}
+genres_clean$genre1 <- str_trim(genres_clean$genre1, "both")
+genres_clean$genre2 <- str_trim(genres_clean$genre2, "both")
+genres_clean$genre3 <- str_trim(genres_clean$genre3, "both")
+```
+
+```{r}
+genres_clean$genre1 <- as.factor(genres_clean$genre1)
+genres_clean$genre2 <- as.factor(genres_clean$genre2)
+genres_clean$genre3 <- as.factor(genres_clean$genre3)
+```
+
+```{r}
+summary(genres_clean)
+```
+
+```{r}
+genres_clean[genres_clean==""] <- NA
+```
+
+
+```{r}
+genres_clean$count<-apply(genres_clean[,c(1:3)],1,function(x) length(which(!is.na(x))))
+```
+
+```{r}
+df1 <- cbind(df1, genres_clean)
+```
+
+```{r}
+df1 %>% 
+  count(genre1, sort= TRUE)
+
+df1 %>% 
+  count(genre2, sort= TRUE)
+
+df1 %>% 
+  count(genre3, sort= TRUE)
+```
+
+#Cleaning Production Companies 
+
+```{r}
+df1$production_string <- as.character(df1$production_companies)
+```
+
+```{r}
+new_production <- str_split_fixed(df1$production_string, ":", n = Inf)
+```
+
+```{r}
+new_production <- new_production[,1:6]
+```
+
+```{r}
+new_production <- new_production[, c(2,4,6)]
+```
+
+```{r}
+new_production <- as.data.frame(new_production)
+```
+
+```{r}
+#https://stat.ethz.ch/R-manual/R-devel/library/base/html/regex.html
+
+new_production <- new_production %>% 
+  mutate(production_company1 = str_replace_all(new_production$V1, "[[:punct:]]", " "))
+```
+
+```{r}
+new_production <- new_production %>% 
+  mutate(production_company2 = str_replace_all(new_production$V2, "[[:punct:]]", " "))
+```
+
+```{r}
+new_production <- new_production %>% 
+  mutate(production_company3 = str_replace_all(new_production$V3, "[[:punct:]]", " "))
+```
+
+```{r}
+new_production$production_company1 <- str_remove(new_production$production_company1,"id")
+new_production$production_company2 <- str_remove(new_production$production_company2,"id")
+new_production$production_company3 <- str_remove(new_production$production_company3,"id")
+```
+
+```{r}
+production_clean <- new_production[,4:6]
+```
+
+```{r}
+production_clean$production_company1 <- str_trim(production_clean$production_company1, "both")
+production_clean$production_company2 <- str_trim(production_clean$production_company2, "both")
+production_clean$production_company3 <- str_trim(production_clean$production_company3, "both")
+```
+
+```{r}
+production_clean$production_company1 <- as.factor(production_clean$production_company1)
+production_clean$production_company2 <- as.factor(production_clean$production_company2)
+production_clean$production_company3 <- as.factor(production_clean$production_company3)
+```
+
+```{r}
+production_clean[production_clean==""] <- NA
+production_clean[production_clean==" "] <- NA
+```
+
+```{r}
+production_clean$count_companies<-apply(production_clean[,c(1:3)],1,function(x) length(which(!is.na(x))))
+```
+
+```{r}
+df1 <- cbind(df1, production_clean)
+```
+
+```{r}
+df1 %>% 
+  count(production_company1, sort= TRUE)
+df1 %>% 
+  count(production_company2, sort= TRUE)
+df1 %>% 
+  count(production_company3, sort= TRUE)
+df1 %>% 
+  count(count_companies, sort= TRUE)
+```
+
+## Data Explorer
+
+```{r}
+library(DataExplorer)
+
+#General structure of the dataset
+plot_str(df1)
+
+
+#Exploratory Report
+
+#Without any dependent variable
+create_report(df1, y = NULL,
+              report_title = "Movies Metadata Exploratory Report")
+
+
+```
+
+#There are several conclusions from this report, in the first place we can see how more than 60% of the movies does not have a third genre, and more than 35% does not have a second genre, from the univariate distribution we observe the presence of outliers, some values being way bigger than the rest of them, but since we are trying to identify what has made such great movies we will not be getting rid of them, we can also see from first impressions the top 3 genres more popular to make a movie 
+
+#Here we can see the frequencies and porcentage of the total of movies that have a first genre
+
+```{r}
+
+genre1_table <- table(df1$genre1)
+genre1_table
+
+prop.table(genre1_table)*100
+sum(prop.table(genre1_table)*100)
+```
+
+#Here we can see the frequencies and porcentage of the total of movies that are in certain language
+
+```{r}
+origlang_table <- table(df1$original_language)
+origlang_table
+
+prop.table(origlang_table)*100
+sum(prop.table(origlang_table)*100)
+```
+
+#As we can appreciate english is the predominant language of the movies, italian, french and spanish also represent an important part  
+
+```{r}
+cross_tab<- table(df1$original_language, df1$genre1)
+cross_tab
+```
+
+#Graph for better appreciation
+
+```{r}
+ggplot(df1, aes(x = original_language)) + 
+  geom_bar() +
+  theme_test()
+```
+
+#Graph of the movies made in certain original languages and the parts of the genre that they represent
+
+```{r}
+
+ggplot(df1, aes(x = original_language, fill = genre1)) + 
+  geom_bar(position = "dodge")
+
+```
+
+#Graph made using Esquisse, as we can appreciate the predominant genre is drama, followed by comedy, action and documentary
+
+```{r}
+
+ggplot(df1) +
+  aes(x = genre1) +
+  geom_bar(fill = "#4682B4") +
+  theme_minimal()
+
+```
+
+#Graph made using Esquisse, as we can appreciate the movies with best revenue in its whole history are the ones of genre action, drama and science fiction
+
+```{r}
+ggplot(df1) +
+  aes(x = genre1, y = revenue) +
+  geom_boxplot(fill = "#112446") +
+  theme_minimal()
+```
+
+#Graph made using Esquisse, most of the movies were made by 3 companies. See how movies made by 3 companies have achieved record revenues
+
+```{r}
+
+ggplot(df1) +
+  aes(x = count_companies, y = revenue) +
+  geom_point(shape = "circle", size = 1.5, colour = "#112346") +
+  theme_minimal()
+
+```
+
+#Graph made using Esquisse, like in the previous graph we can see how there is a tendency to make movies with 3 genres, and some of them have had the highest revenues
+
+```{r}
+
+ggplot(df1) +
+  aes(x = count, y = revenue_mean) +
+  geom_point(shape = "square", size = 1.5, colour = "#E24116") +
+  theme_minimal()
+
+```
+
+#Graph made using Esquisse, to more appreciate how the languages have influence in its revenue, to be analyzed
+
+```{r}
+ggplot(df1) +
+  aes(x = original_language, y = revenue) +
+  geom_boxplot(fill = "#FF8C00") +
+  theme_minimal()
+```
+
+#Most released genres of the movies are drama, comedy, action and horror. English language
+
+```{r}
+
+ggplot(df1, aes(x = original_language)) + 
+  geom_bar() +
+  facet_wrap(~ genre1)+
+  theme_light()
+
+```
+
+#Stablishing as factors the number of vote average that the movies have obtained 
+
+```{r}
+
+voteup <- filter(df1, vote_average %in% c(0, 5, 6, 7, 8, 9))
+
+```
+
+#We find out in the next graph that a high vote average does not necessarily means the movie will obtain a high revenue, in a scale from 0 to 10 the vote average 7 has obtained more revenue than number 8 and 9 (record revenues)
+
+```{r}
+
+ggplot(voteup, aes(x = as.factor(vote_average), y = revenue)) +
+  geom_boxplot()
+
+```
+
+#Comparing this and the previous graph we see how there is somewhat of a correlation between the budget and revenue to make a succesfull movie
+
+```{r}
+
+ggplot(voteup, aes(x = as.factor(vote_average), y = budget)) +
+  geom_boxplot()
+
+```
+
+#We can observe that most of the outliers are above the Interquartil Range
+
+```{r}
+ggplot(df1, aes(vote_average)) +
+  geom_boxplot() +
+  coord_flip()
+```
+
+#In the next density plot we observe a median density in th low end and a high densithy between 5 and 7.5, which agrees with the interpretation of the boxplot
+
+```{r}
+ggplot(df1, aes(x = vote_average)) +
+  geom_density(fill = "lightblue")
+```
+
+## We can also confirm because of the high density in the low end that most of the outliers are above the IQR
+
+
+```{r}
+
+ggplot(df1, aes(x=id)) + geom_histogram()
+
+dotplot<-ggplot(df1, aes(x=original_language, y=budget)) + geom_dotplot(binaxis='y', stackdir='center' )
+
+dotplot
+
+```
+
+#Graph of correlation between revenue and budget with trend line added to appreciate how does it behave, there is an existent correlation
+
+```{r}
+
+ggplot(df1, aes(y = revenue_mean, x = budget_mean)) +  geom_point() +
+  geom_smooth(method = "lm", se = TRUE)
+
+```
+
+#Using groupwise to observe the difference between the budget obtained when a movie is made in english or not
+
+```{r}
+df1_GroupBy1 <- df1 %>% mutate(EnglishGroup= original_language %in% c("en")) %>% group_by(EnglishGroup) %>% summarise(mean(budget_mean)) 
+
+df1_GroupBy1
+```
+#There is a relatively strong correlation between the revenue and the budget, obtaining a result of 0.768 in the Pearson coefficient of correlation
+
+```{r}
+
+df1 %>%
+  summarize(N = n(), r = cor(revenue_mean, budget_mean))
+
+```
+
+#These two variables are somewhat correlated but not as much as the budget used in a movie, giving a result of 0.505
+
+```{r}
+
+df1 %>%
+  summarize(N = n(), r = cor(popularity_mean, revenue_mean))
+
+```
+
+#Correlation result of less than 0.1 proves that high vote average does not mean high revenue
+
+```{r}
+
+df1 %>%
+  summarize(N = n(), r = cor(vote_average_mean, revenue_mean))
+
+```
+
+#No big correlation between a popular movie and high vote average movie
+
+```{r}
+
+df1 %>%
+  summarize(N = n(), r = cor(popularity_mean, vote_average_mean))
+
+```
+
+#Extra function, using the function which.max or which.min we can find out in which row the first maximun or minimum value of a numeric column, so we can investigate more deeply why exactly that row had a maximum or minimum value
+
+```{r}
+
+which.max(df1$vote_count)
+which.max(df1$budget)                          
+which.max(df1$revenue)                          
+which.min(df1$runtime)
+which.min(df1$popularity)
+
+#Given that we now that there is a maximum value for something as important as revenue in the row number 14548 we now go check the information of that movie to keep doing analysis
+
+```
+
+
+```{r}
+sampledf2<- head(df1,20)
+```
+
+example<- as.matrix
+
+```{r}
+data <- as.matrix(mtcars)
+heatmap(data)
+heatmap(data, scale="column")
+```
+
+#Conclusions
+
+##First of all we can realize that the movies with the highest vote average are not the most successful ones (considering success correlated to the quantity of revenue) the movies with the top score revenue had a 7 as a vote average, also given by the table of frequencies converted to percent we appreciate how there is an enormous difference in the original language of the movies. 70% of them are in english, these are the ones that have made the biggest revenue in movies history, although chinese, japanese and french movies also have had good revenue. Movies with genres of drama, action and science fiction are the best achieving ones, this is relevant given to the fact that science fiction is not one of the top 3 most made movies with that genre, comedy is but does not have as good results. Movies with 3 genres have also obtained best revenue compared to movies with only 2 or 1 genre, similar thing happens when there is 3 production companies instead of 2 or 1. There is a high correlation between using more budget to get more revenue, popularity and revenue are also correlated though not as much. It is a really interesting fact that a high vote average does not mean high revenue, it can be interpretated as how good marketing, expensive actors and an interesting overview are way more important than making a movie taking in account factors that production companies know will rise the vote average by making them more 'artistic' 
+
+#Recommendation to major production company
+
+##If I were going to produce a movie, after analizing this dataI would choose to produce a science fiction movie with a really interesting plot and overview since this genre is not made as much as the rest of the genres and have had really good results, also with action and drama, partner up with other production companies would affect positively to the movie as having 3 genres. Taking into account that popularity and vote average are very weakly correlated I would choose the plot of the movie to be very appealing to everyone rather than 'smart' if the desire of the production company is to just achieve a high revenue, as it could be deduced a high budget has a big correlation with its revenue, to be really analyzed by the company in what to invest (being aware of the interpretation in the conclusions paragraph)
